@@ -5,7 +5,6 @@ An interactive web-based tool for determining antimicrobial susceptibility based
 **Project made by Naman Devadiga. Happy Learning!!**
 
 [![Screenshot-2025-07-26-172120.png](https://i.postimg.cc/KvLbW0hT/Screenshot-2025-07-26-172120.png)](https://postimg.cc/Wh2xF63p)
-*Note: You will need to take a screenshot of the application and replace the URL above.*
 
 ---
 
