@@ -33,7 +33,7 @@ This project is built with vanilla HTML, CSS, and JavaScript, and it uses Tailwi
 
 ## Getting Started
 
-To run this project locally, simply download the `index.html` file and open it in your web browser.
+To run this project locally, simply download the `KBz - Antibiotic Susceptibility Analyzer.html` file and open it in your web browser.
 
 1.  **Clone the repository or download the source code:**
     ```sh
@@ -43,7 +43,7 @@ To run this project locally, simply download the `index.html` file and open it i
     ```sh
     cd your-repository-name
     ```
-3.  **Open the `index.html` file in your browser.**
+3.  **Open the `KBz - Antibiotic Susceptibility Analyzer.html` file in your browser.**
     You can do this by double-clicking the file or by right-clicking and selecting "Open with" your preferred browser.
 
 ## Data Source
