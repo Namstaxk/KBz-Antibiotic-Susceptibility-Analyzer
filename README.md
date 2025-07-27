@@ -2,7 +2,7 @@
 
 An interactive web-based tool for determining antimicrobial susceptibility based on the Kirby-Bauer disk diffusion method. This application provides a user-friendly interface to classify microorganisms as Susceptible, Intermediate, or Resistant based on their zone of inhibition diameter.
 
-**Project made by Naman Devadiga. Happy Learning!!**
+**Project made by Namstaxk. Happy Learning!!**
 
 [![Screenshot-2025-07-27-124314.png](https://i.postimg.cc/gkbFwL1m/Screenshot-2025-07-27-124314.png)](https://postimg.cc/G9KSVtc5)
 
