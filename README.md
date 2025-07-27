@@ -1,4 +1,4 @@
-# KBz - Antimicrobial Susceptibility Analyzer 💊
+# KBz - Antimicrobial Susceptibility Analyzer 💊🦠
 
 An interactive web-based tool for determining antimicrobial susceptibility based on the Kirby-Bauer disk diffusion method. This application provides a user-friendly interface to classify microorganisms as Susceptible, Intermediate, or Resistant based on their zone of inhibition diameter.
 
