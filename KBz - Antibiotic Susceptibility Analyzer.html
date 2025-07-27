@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KBz - Antimicrobial Susceptibility Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)),
+                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px -10px rgba(0, 20, 50, 0.15);
+            border: 1px solid #e5e7eb;
+            position: relative;
+            overflow: hidden;
+        }
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+        .result-card {
+            transition: all 0.3s ease-in-out;
+            border-width: 1px;
+            border-left-width: 5px;
+        }
+        .result-susceptible { background-color: #f0fdf4; border-color: #22c55e; color: #15803d; }
+        .result-intermediate { background-color: #fefce8; border-color: #f59e0b; color: #b45309; }
+        .result-resistant { background-color: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+        .result-unknown { background-color: #f8fafc; border-color: #64748b; color: #475569; }
+
+        #petri-dish-svg {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            margin: auto;
+        }
+        #inhibition-zone {
+            transition: r 0.4s ease-out, fill 0.4s ease-out;
+        }
+        .zone-susceptible { fill: #22c55e; }
+        .zone-intermediate { fill: #f59e0b; }
+        .zone-resistant { fill: #ef4444; }
+        .zone-unknown { fill: #9ca3af; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        
+        .input-group { position: relative; }
+        .input-group .fa-solid {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            z-index: 10;
+        }
+        .input-group input, .input-group select {
+            padding-left: 2.75rem;
+            background-color: #f9fafb;
+            border-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="main-container w-full max-w-4xl mx-auto p-6 md:p-8">
+        <div class="content-wrapper">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-tight">KBz - Antibiotic Susceptibility Analyzer</h1>
+                <p class="text-gray-500 mt-3">
+                    Determine susceptibility with a visual petri dish representation.
+                    <br>
+                    <a href="https://www.himedialabs.com/media/Catalogue/literature/microbiology/antimicrobial-susceptibility-systems.pdf" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline text-sm font-medium">
+                        Click here to download HiMedia Susceptibility Test Reference Chart.
+                    </a>
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Left Column: Form Controls -->
+                <div class="space-y-6">
+                    <div>
+                        <label for="antibiotic-search" class="block text-sm font-medium text-gray-700 mb-1">Antimicrobial Agent</label>
+                        <div class="relative" id="antibiotic-dropdown-container">
+                            <div class="input-group">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="antibiotic-search" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="Search or select an antibiotic">
+                            </div>
+                            <div id="antibiotic-options" class="absolute z-20 w-full bg-white border rounded-lg mt-1 hidden max-h-60 overflow-y-auto custom-scrollbar shadow-lg">
+                                <!-- Options populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="microorganism" class="block text-sm font-medium text-gray-700 mb-1">Microorganism</label>
+                        <div class="input-group">
+                            <i class="fa-solid fa-bacterium"></i>
+                            <select id="microorganism" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" disabled>
+                                <option value="">Select a microorganism</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="discContent" class="block text-sm font-medium text-gray-700 mb-1">Disc Content</label>
+                        <div class="input-group">
+                            <i class="fa-solid fa-database"></i>
+                            <select id="discContent" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" disabled>
+                                <option value="">Select disc content</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="diameter" class="block text-sm font-medium text-gray-700 mb-1">Zone of Inhibition Diameter (mm)</label>
+                        <div class="input-group">
+                            <i class="fa-solid fa-ruler-horizontal"></i>
+                            <input type="number" id="diameter" placeholder="e.g., 18" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" disabled>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Visualization and Results -->
+                <div class="flex flex-col justify-center items-center space-y-4">
+                    <div id="visualization-container" class="w-full p-4 bg-gray-50 rounded-lg border">
+                        <svg id="petri-dish-svg" viewBox="0 0 200 200">
+                            <defs>
+                                <pattern id="lawn" patternUnits="userSpaceOnUse" width="6" height="6">
+                                    <circle cx="1.5" cy="1.5" r="1" fill="#d97706" opacity="0.3"/>
+                                </pattern>
+                                <filter id="dish-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000" flood-opacity="0.1"/>
+                                </filter>
+                            </defs>
+                            <g filter="url(#dish-shadow)">
+                                <circle cx="100" cy="100" r="98" fill="#fefce8" />
+                                <circle cx="100" cy="100" r="98" fill="url(#lawn)" />
+                                <circle cx="100" cy="100" r="98" fill="transparent" stroke="#d1d5db" stroke-width="2" />
+                            </g>
+                            <circle cx="100" cy="100" r="94" fill="transparent" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" />
+
+                            <circle id="inhibition-zone" cx="100" cy="100" r="0" class="zone-unknown" opacity="0.85" />
+                            <circle cx="100" cy="100" r="6" fill="#ffffff" stroke="#4b5563" stroke-width="1" />
+                            <text id="diameter-label" x="100" y="195" font-size="12" text-anchor="middle" fill="#1f2937" font-weight="600">0 mm</text>
+                        </svg>
+                    </div>
+                    <div id="result-container" class="w-full">
+                        <div id="result-display" class="result-card p-4 rounded-lg hidden flex items-center space-x-3">
+                            <i id="result-icon" class="fa-solid fa-lg"></i>
+                            <div>
+                                <h3 id="result-title" class="text-lg font-bold"></h3>
+                                <p id="result-description" class="text-sm"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="criteria-container" class="mt-8 p-5 bg-slate-50 rounded-lg hidden border">
+                <h4 class="text-lg font-bold text-gray-800 mb-4 text-center">Reference Criteria</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    <div>
+                        <p class="text-sm text-gray-500">Susceptible</p>
+                        <p id="ref-susceptible" class="font-bold text-2xl text-green-600">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Intermediate</p>
+                        <p id="ref-intermediate" class="font-bold text-2xl text-yellow-500">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Resistant</p>
+                        <p id="ref-resistant" class="font-bold text-2xl text-red-600">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-center text-xs text-gray-500 mt-8">Project made by Naman Devadiga with ❤️. Happy Learning!!</p>
+        </div>
+    </div>
+
+    <script>
+        // Data from the provided CSV file, with additions for missing antibiotics.
+        const csvData = `Antibiotic agent,Micro-organism,Disc Content,Sensitive (mm or more),Intermediate (mm),Resistant (mm or less)
+Amikacin ," Enterobacteriaceae, P. aeruginosa, Acinetobacter & Staphylococcus spp.",30 mcg,17,15-16,14
+Amikacin , Enterobacteriaceae (EUCAST),30 mcg,18,15-17,15
+Amikacin , Pseudomonas spp. (EUCAST),30 mcg,18,15-17,15
+Amikacin , Staphylococcus spp. (EUCAST),30 mcg,18,16-17,16
+Amikacin , Coagulase negative staphylococci (EUCAST),30 mcg,22,19-21,19
+Amikacin , Acinetobacter spp. (EUCAST),30 mcg,19,17-18,17
+Amoxyclav (Amoxicillin/Clavulanic acid) , Enterobacteriaceae & Haemophilus influenzae,30 mcg (20/10),18,14-17,13
+Amoxyclav (Amoxicillin/Clavulanic acid) , Haemophilus parainfluenzae,30 mcg (20/10),20,-,19
+Amoxyclav (Amoxicillin/Clavulanic acid) , Enterobacteriaceae (EUCAST),30 mcg (20/10),19,-,19
+Amoxyclav (Amoxicillin/Clavulanic acid) , Enterobacteriaceae (uncomplicated UTI only) (EUCAST),30 mcg (20/10),16,-,16
+Amoxyclav (Amoxicillin/Clavulanic acid) , Haemophilus influenzae (EUCAST),30 mcg (20/10),15,-,15
+Amoxyclav (Amoxicillin/Clavulanic acid) , Moraxella catarrhalis (EUCAST),30 mcg (20/10),19,-,61
+Amoxyclav (Amoxicillin/Clavulanic acid) , Pasteurella multocida (EUCAST),30 mcg (20/10),15,-,15
+Ampicillin ," Enterobacteriaceae, Staphylococcus spp. & Enterococcus spp.",10 mcg,17,14-16,13
+Ampicillin , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,22,19-21,18
+Ampicillin , Streptococcus spp. beta haemolytic group,10 mcg,24,-,-
+Ampicillin , Enterobacteriaceae (EUCAST),2 mcg,14,-,14
+Ampicillin , Staphylococcus saprophyticus (EUCAST),2 mcg,18,-,18
+Ampicillin , Enterococcus spp. (EUCAST),2 mcg,10,2025-08-09,8
+Ampicillin , Streptococcus spp. viridans group (EUCAST),2 mcg,21,15-20,15
+Ampicillin , Haemophilus influenzae & Listeria monocytogenes (EUCAST),2 mcg,16,-,16
+Ampicillin , Pasteurella multocida (EUCAST),2 mcg,17,-,17
+Ampicillin , Aerococcus sanguinicola & urinae (EUCAST),2 mcg,26,-,26
+Ampicillin/Sulbactam ," Enterobacteriaceae, Acinetobacter & Haemophilus influenzae",10/10 mcg,15,2025-12-14,11
+Ampicillin/Sulbactam , Haemophilus parainfluenzae,10/10 mcg,20,-,19
+Ampicillin/Sulbactam , Enterobacteriaceae (EUCAST),10/10 mcg,14,-,14
+Azithromycin ," Staphylococcus, S.pneumoniae, Streptococcus spp. Viridans group & Streptococcus spp. beta haemolytic group",15 mcg,18,14-17,13
+Azithromycin , Haemophilus influenzae & Haemophilus parainfluenzae,15 mcg,12,-,-
+Azithromycin , Neisseria meningitidis,15 mcg,20,-,-
+Azithromycin , Salmonella Typhi,15 mcg,13,-,12
+Azlocillin,-,75 mcg,-,-,-
+Aztreonam , Enterobacteriaceae & P. aeruginosa,30 mcg,21,18-20,17
+Aztreonam , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,26,-,-
+Aztreonam , Enterobacteriaceae (EUCAST),30 mcg,26,21-25,21
+Aztreonam , Pseudomonas spp. (EUCAST),30 mcg,50,16-49,16
+Bacitracin,-,10 units,13,2025-09-12,8
+Carbenicillin,-,100 mcg,-,-,-
+Cefaclor ," Enterobacteriaceae, Staphylococcus spp, Haemophilus influenzae & Haemophilus parainfluenzae",30 mcg,18,15-17,14
+Cefaclor , S. pneumoniae (EUCAST),30 mcg,20,17-19,16
+Cefadroxil , Enterobacteriaceae,30 mcg,12,-,12
+Cefalexin , Enterobacteriaceae,30 mcg,14,-,14
+Cefamandole ," Enterobacteriaceae, Staphylococcus spp",30 mcg,18,15-17,14
+Cefazolin , Enterobacteriaceae,30 mcg,23,20-22,19
+Cefazolin , Enterobacteriaceae (uncomplicated UTIs),30 mcg,15,-,-
+Cefazolin , Staphylococcus spp.,30 mcg,18,15-17,14
+Cefdinir ," Enterobacteriaceae, Staphylococcus spp, Haemophilus influenzae & Haemophilus parainfluenzae",5 mcg,20,17-19,16
+Cefepime , Enterobacteriaceae,30 mcg,25,19-24,18
+Cefepime ," P. aeruginosa, Acinetobacter, Haemophilus influenzae & Haemophilus parainfluenzae",30 mcg,18,15-17,14
+Cefepime , Neisseria gonorrhoeae,30 mcg,31,-,-
+Cefepime , Streptococcus spp. Viridans group,30 mcg,24,22-23,21
+Cefepime , Streptococcus spp. beta haemolytic group,30 mcg,24,-,-
+Cefepime , Enterobacteriaceae (EUCAST),30 mcg,27,-,26
+Cefepime , Pseudomonas spp (EUCAST),30 mcg,19,-,19
+Cefepime , Streptococcus spp. viridans group (EUCAST),30 mcg,25,-,25
+Cefepime , Haemophilus influenzae (EUCAST),30 mcg,20,-,20
+Cefepime , Moraxella catarrhalis (EUCAST),30 mcg,27,24-26,24
+Cefepime , Aeromonas spp. (EUCAST),30 mcg,24,-,24
+Cefixime , Enterobacteriaceae & Haemophilus influenzae,5 mcg,19,16-18,15
+Cefixime , Haemophilus parainfluenzae,5 mcg,21,-,-
+Cefixime , Neisseria gonorrhoeae,5 mcg,31,-,-
+Cefixime , Enterobacteriaceae (EUCAST),5 mcg,17,-,17
+Cefixime , Haemophilus influenzae (EUCAST),5 mcg,26,-,26
+Cefixime , Moraxella catarrhalis (EUCAST),5 mcg,21,18-20,18
+Cefmetazole , Enterobacteriaceae,30 mcg,16,13-15,12
+Cefmetazole , Neisseria gonorrhoeae,30 mcg,33,28-32,27
+Cefonicid ," Enterobacteriaceae, Haemophilus influenzae & Haemophilus parainfluenzae",30 mcg,18,15-17,14
+Cefoperazone , Enterobacteriaceae,75 mcg,21,16-20,15
+Cefotaxime ," Enterobacteriaceae, Acinetobacter & Staphylococcus spp.",30 mcg,26,23-25,22
+Cefotaxime , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,26,-,-
+Cefotaxime , Neisseria meningitidis,30 mcg,34,-,-
+Cefotaxime , Neisseria gonorrhoeae,30 mcg,31,-,-
+Cefotaxime , Streptococcus spp. Viridans group,30 mcg,28,26-27,25
+Cefotaxime , Streptococcus spp. beta haemolytic group,30 mcg,24,-,-
+Cefotaxime , Enterobacteriaceae (EUCAST),5 mcg,20,17-19,17
+Cefotaxime , Haemophilus influenzae (EUCAST),5 mcg,26,-,26
+Cefotaxime , Moraxella catarrhalis (EUCAST),5 mcg,27,-,27
+Cefotaxime , Pasteurella multocida (EUCAST),5 mcg,20,17-19,17
+Cefotaxime , Streptococcus spp. viridans group (EUCAST),5 mcg,23,-,23
+Cefotaxime , Kingella kingae (EUCAST),5 mcg,27,-,<27
+Cefotetan , Enterobacteriaceae,30 mcg,16,13-15,12
+Cefoxitin , Enterobacteriaceae,30 mcg,18,15-17,14
+Cefoxitin , For S. aureus & S. lugdunensis,30 mcg,22,-,21
+Cefoxitin ,For Coagulase-negative Staphylococci,30 mcg,25,-,24
+Cefoxitin , Neisseria gonorrhoeae,30 mcg,26,20-25,19
+Cefoxitin , Neisseria gonorrhoeae (EUCAST),30 mcg,28,24-27,23
+Cefoxitin , Enterobacteriaceae (EUCAST),30 mcg,19,-,19
+Cefoxitin , Staphylococcus spp (EUCAST),30 mcg,25,-,25
+Cefpodoxime ," Enterobacteriaceae, Staphylococcus spp.",10 mcg,21,18-20,17
+Cefpodoxime , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,21,-,-
+Cefpodoxime , Neisseria gonorrhoeae,10 mcg,29,-,-
+Cefpodoxime , Enterobacteriaceae (EUCAST),10 mcg,23,23-25,23
+Cefpodoxime , Haemophilus influenzae (EUCAST),10 mcg,26,-,26
+Cefprozil ," Enterobacteriaceae, Haemophilus influenzae & Haemophilus parainfluenzae",30 mcg,18,15-17,14
+Ceftazidime ," Enterobacteriaceae, B. cepacia, P. aeruginosa, Acinetobacter & Staphylococcus spp.",30 mcg,18,15-17,14
+Ceftazidime , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,26,-,-
+Ceftazidime , Neisseria gonorrhoeae,30 mcg,31,-,-
+Ceftazidime , Enterobacteriaceae (EUCAST),10 mcg,22,19-21,19
+Ceftazidime , Pseudomonas spp. (EUCAST),10 mcg,17,-,17
+Ceftizoxime , Enterobacteriaceae & Haemophilus influenzae,30 mcg,25,22-24,21
+Ceftizoxime , Haemophilus parainfluenzae,30 mcg,26,-,-
+Ceftizoxime , Neisseria gonorrhoeae,30 mcg,38,-,-
+Ceftriaxone ," Enterobacteriaceae, P. aeruginosa, Acinetobacter & Staphylococcus spp.",30 mcg,23,20-22,19
+Ceftriaxone , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,26,-,-
+Ceftriaxone , Neisseria meningitidis,30 mcg,34,-,-
+Ceftriaxone , Neisseria gonorrhoeae,30 mcg,35,-,-
+Ceftriaxone , Streptococcus spp. Viridans group,30 mcg,27,25-26,24
+Ceftriaxone , Streptococcus spp. beta haemolytic group,30 mcg,24,-,-
+Ceftriaxone , Enterobacteriaceae (EUCAST),30 mcg,25,22-24,22
+Ceftriaxone , Streptococcus spp viridans group (EUCAST),30 mcg,27,-,<27
+Ceftriaxone , Haemophilus influenzae (EUCAST),30 mcg,31,21-23,21
+Ceftriaxone , Moraxella catarrhalis (EUCAST),30 mcg,24,-,24
+Ceftriaxone , Kingella kingae (EUCAST),30 mcg,30,-,30
+Cefuroxime , Enterobacteriaceae (parenteral) & Staphylococcus spp.,30 mcg,18,15-17,14
+Cefuroxime , Enterobacteriaceae (oral),30 mcg,23,15-22,14
+Cefuroxime , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,20,17-19,16
+Cefuroxime , Neisseria gonorrhoeae,30 mcg,31,25-30,25
+Cefuroxime , Enterobacteriaceae (IV) & (Oral) (EUCAST),30 mcg,19,-,19
+Cefuroxime , Streptococcus spp. viridans group (IV) (EUCAST),30 mcg,26,-,<26
+Cefuroxime , Haemophilus influenzae (IV) (EUCAST),30 mcg,26,-,26
+Cefuroxime , Haemophilus influenzae (Oral) (EUCAST),30 mcg,50,26-49,26
+Cefuroxime , Moraxella catarrhalis (IV) (EUCAST),30 mcg,21,18-20,18
+Cefuroxime , Moraxella catarrhalis (Oral) (EUCAST),30 mcg,50,21-49,21
+Cefuroxime , Kingella kingae (IV) (EUCAST),30 mcg,29,-,29
+Cephalothin,-,30 mcg,-,-,-
+Chloramphenicol ," Enterobacteriaceae, Staphylococcus & Enterococcus spp.",30 mcg,18,13-17,12
+Chloramphenicol , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,29,26-28,25
+Chloramphenicol , Neisseria meningitidis,30 mcg,26,20-25,19
+Chloramphenicol , S. pneumoniae,30 mcg,21,-,20
+Chloramphenicol , Streptococcus spp. Viridans group & beta haemolytic group,30 mcg,21,18-20,17
+Chloramphenicol , Enterobacteriaceae (EUCAST),30 mcg,17,-,17
+Chloramphenicol , Staphylococcus spp. (EUCAST),30 mcg,18,-,18
+Chloramphenicol ," Streptococcus group A, B, C & G (EUCAST)",30 mcg,19,-,19
+Chloramphenicol , S. pneumoniae (EUCAST),30 mcg,28,-,21
+Chloramphenicol , Haemophilus influenzae (EUCAST),30 mcg,30,-,30
+Chloramphenicol , Moraxella catarrhalis (EUCAST),30 mcg,28,-,530
+Cinoxacin , Enterobacteriaceae,100 mcg,19,15-18,14
+Ciprofloxacin ," Enterobacteriaceae other than S. Typhi, P. aeruginosa, Acinetobacter, Staphylococcus & Enterococcus spp.",5 mcg,21,16-20,15
+Ciprofloxacin , For S. Typhi and extraintestinal Salmonella spp.,5 mcg,31,21-30,20
+Ciprofloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,21,-,-
+Ciprofloxacin , Neisseria meningitidis,5 mcg,35,33-34,32
+Ciprofloxacin , Neisseria gonorrhoeae,5 mcg,41,28-40,27
+Ciprofloxacin , Moraxella catarrhalis (EUCAST),5 mcg,31,-,31
+Ciprofloxacin , Enterobacteriaceae (EUCAST),5 mcg,28,24-25,24
+Ciprofloxacin , Staphylococcus spp. (EUCAST),5 mcg,21,-,21
+Ciprofloxacin , Coagulasenegative Staphylococci (EUCAST),5 mcg,24,-,24
+Ciprofloxacin , Pseudomonas spp. (EUCAST),5 mcg,26,-,26
+Ciprofloxacin , Enterococcus spp. (EUCAST),5 mcg,15,-,15
+Ciprofloxacin , Acinetobacter spp. (EUCAST),5 mcg,21,-,21
+Ciprofloxacin , Haemophilus influenzae (EUCAST),5 mcg,30,-,30
+Ciprofloxacin , Campylobacter spp. (EUCAST),5 mcg,31,21,21
+Ciprofloxacin , Pasteurella multocida (EUCAST),5 mcg,27,-,27
+Ciprofloxacin , Corynebacterium spp. (EUCAST),5 mcg,25,-,25
+Ciprofloxacin , Aerococcus sanguinicola & urinae (EUCAST),5 mcg,21,-,21
+Ciprofloxacin , Kingella kingae (EUCAST),5 mcg,28,-,28
+Ciprofloxacin , Aeromonas spp. (EUCAST),5 mcg,27,24-26,24
+Clarithromycin , Staphylococcus spp.,15 mcg,18,14-17,13
+Clarithromycin , Haemophilus influenzae & Haemophilus parainfluenzae,15 mcg,13,2025-11-12,10
+Clarithromycin ," S. pneumoniae, Streptococcus spp. Viridans group, Streptococcus spp. beta haemolytic group",15 mcg,21,17-20,18
+Clindamycin , Staphylococcus spp.,2 mcg,21,15-20,14
+Clindamycin ," S. pneumoniae, Streptococcus spp. Viridans group, Streptococcus spp. beta haemolytic group",2 mcg,19,16-18,15
+Clindamycin , Staphylococcus spp. (EUCAST),2 mcg,22,19-21,19
+Clindamycin , Streptococcus spp viridans group & S. pneumoniae (EUCAST),2 mcg,19,-,19
+Clindamycin ," Streptococcus group A B, C & G (EUCAST)",2 mcg,17,-,17
+Clindamycin , Corynebacterium spp. (EUCAST),2 mcg,20,-,20
+Colistin (Methane Sulphonate),Trimoxazole ,10 mcg,2025-11-17,2025-11-17,-
+Trimoxazole ," Enterobacteriaceae, Acinetobacter, B. cepacia, S. maltophila, Staphylococcus, Haemophilus influenzae & Haemophilus parainfluenzae",25 mcg (1.25/23.75),16,2025-11-15,10
+Trimoxazole , Neisseria meningitidis,25 mcg (1.25/23.75),30,26-29,25
+Trimoxazole , S. pneumoniae,25 mcg (1.25/23.75),19,16-18,15
+Trimoxazole , Enterobacteriaceae (EUCAST),25 mcg (1.25/23.75),14,2025-11-13,11
+Trimoxazole , Acinetobacter spp. (EUCAST),25 mcg (1.25/23.75),14,2025-11-13,11
+Trimoxazole , Staphylococcus spp (EUCAST),25 mcg (1.25/23.75),17,14-16,14
+Trimoxazole , Stenotrophomonas maltophila (EUCAST),25 mcg (1.25/23.75),16,-,16
+Trimoxazole , Enterococcus spp. (EUCAST),25 mcg (1.25/23.75),21,50,21-49
+Trimoxazole ," Streptococcus group A, B, C & G., S.pneumoniae, Moraxella catarrhalis (EUCAST)",25 mcg (1.25/23.75),18,15-17,15
+Trimoxazole , Haemophilus influenzae (EUCAST),25 mcg (1.25/23.75),23,20-22,20
+Trimoxazole , Listeria monocytogens (EUCAST),25 mcg (1.25/23.75),29,-,29
+Trimoxazole , Pasteurella multocida (EUCAST),25 mcg (1.25/23.75),23,-,23
+Trimoxazole , Kingella kingae (EUCAST),25 mcg (1.25/23.75),28,-,28
+Trimoxazole , Aeromonas spp. (EUCAST),25 mcg (1.25/23.75),19,-,16
+Doripenem , Enterobacteriaceae & P. aeruginosa,10 mcg,23,20-22,19
+Doripenem , Acinetobacter spp.,10 mcg,19,16-18,15
+Doripenem , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,18,15-17,14
+Doripenem , Acinetobacter spp. (EUCAST),10 mcg,16,-,-
+Doripenem , Enterobacteriaceae (EUCAST),10 mcg,25,22-24,22
+Doripenem , Pseudomonas spp (EUCAST),10 mcg,24,21-23,21
+Doripenem , Acinetobacter spp. (EUCAST),10 mcg,24,21-23,21
+Doripenem , Haemophilus influenzae (EUCAST),10 mcg,20,-,20
+Doripenem , Moraxella catarrhalis (EUCAST),10 mcg,30,-,30
+Doxycycline Hydrochloride , Enterobacteriaceae,30 mcg,14,2025-11-13,10
+Doxycycline Hydrochloride , Acinetobacter,30 mcg,13,2025-10-12,9
+Doxycycline Hydrochloride , Staphylococcus & Enterococcus spp.,30 mcg,16,13-15,12
+Doxycycline Hydrochloride , S. pneumoniae,30 mcg,28,25-27,24
+Enoxacin , Enterobacteriaceae,10 mcg,18,15-17,14
+Enoxacin , Staphylococcus spp.,10 mcg,18,15-17,14
+Enoxacin , Neisseria gonorrhoeae,10 mcg,36,32-35,31
+Ertapenem , Enterobacteriaceae,10 mcg,22,19-21,18
+Ertapenem , Staphylococcus spp.,10 mcg,19,16-18,15
+Ertapenem , Haemophilus influenzae & parainfluenzae,10 mcg,19,-,-
+Ertapenem , Enterobacteriaceae (EUCAST),10 mcg,25,22-24,22
+Ertapenem , Haemophilus influenzae (EUCAST),10 mcg,20,-,-
+Ertapenem , Moraxella catarrhalis (EUCAST),10 mcg,29,-,-
+Erythromycin , Staphylococcus & Enterococcus spp.,15 mcg,23,14-22,13
+Erythromycin ," S. pneumoniae, Streptococcus spp. Viridans group, Streptococcus spp. beta haemolytic group",15 mcg,21,16-20,15
+Erythromycin ," Staphylococcus spp. & Streptococcus group A, B, C & G (EUCAST)",15 mcg,21,18-20,18
+Erythromycin , S.pneumoniae (EUCAST),15 mcg,22,19-21,19
+Erythromycin , Moraxella catarrhalis (EUCAST),15 mcg,23,20-22,20
+Erythromycin , Listeria monocytogens (EUCAST),15 mcg,25,-,25
+Erythromycin , Campylobacter coli (EUCAST),15 mcg,24,-,24
+Erythromycin , Campylobacter jejuni (EUCAST),15 mcg,20,-,20
+Erythromycin , Kingella kingae (EUCAST),15 mcg,20,-,20
+Faropenem , Enterobacteriaceae,5 mcg,-,-,-
+Fosfomycin ," Enterobacteriaceae, Enterococcus spp.",200 mcg,16,13-15,12
+Fosfomycin , Enterobacteriaceae (IV) & (oral) (EUCAST),200 mcg,24,-,24
+Fusidic acid , Staphylococcus spp.,10 mcg,24-,-,24
+Gatifloxacin ," Enterobacteriaceae, P. aeruginosa, Acinetobacter & Enterococcus spp.",5 mcg,18,15-17,14
+Gatifloxacin , Staphylococcus spp.,5 mcg,21,18-20,17
+Gatifloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,23,20-22,19
+Gatifloxacin , Neisseria gonorrhoeae,5 mcg,38,34-37,33
+Gatifloxacin ," S. pneumoniae, Streptococcus spp Viridans group, Streptococcus spp. beta haemolytic group",5 mcg,21,18-20,17
+Gemifloxacin , Enterobacteriaceae,5 mcg,20,16-19,15
+Gemifloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,23,20-22,19
+Gemifloxacin , S. pneumoniae,5 mcg,18,-,-
+Gentamicin , Enterococcus spp. (High Level),120 mcg,10,2025-07-09,6
+Gentamicin ," Enterobacteriaceae, P. aeruginosa, Acinetobacter & Staphylococcus spp.",10 mcg,15,13-14,12
+Gentamicin , Enterobacteriaceae (EUCAST),10 mcg,18,14-16,14
+Gentamicin , Staphylococcus spp. (EUCAST),10 mcg,18,-,18
+Gentamicin , Coagulase negative Staphylococci (EUCAST),10 mcg,22,-,22
+Gentamicin , Pseudomonas spp. (EUCAST),10 mcg,15,-,15
+Gentamicin , Acinetobacter spp (EUCAST),10 mcg,17,-,17
+Gentamicin , Corynebacterium spp (EUCAST),10 mcg,23,-,23
+Gentamicin , Enterococcus spp.,30 mcg,-,-,-
+Imipenem , Enterobacteriaceae,10 mcg,23,20-22,19
+Imipenem , P. aeruginosa,10 mcg,19,16-18,15
+Imipenem , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,22,19-21,18
+Imipenem , Acinetobacter spp.,10 mcg,16,-,-
+Imipenem , Enterobacteriaceae (EUCAST),10 mcg,22,16-21,16
+Imipenem , Pseudomonas spp. (EUCAST),10 mcg,20,17-19,17
+Imipenem , Acinetobacter spp. (EUCAST),10 mcg,23,17-22,17
+Imipenem , Enterococcus spp. (EUCAST),10 mcg,21,18-20,18
+Imipenem , Haemophilus influenzae (EUCAST),10 mcg,20,-,20
+Imipenem , Moraxella catarrhalis (EUCAST),10 mcg,29,-,62
+Kanamycin ," Enterobacteriaceae, Staphylococcus spp",30 mcg,18,14-17,13
+Levofloxacin ," Enterobacteriaceae, S. Typhi, P. aeruginosa, Acinetobacter spp., S. maltophila, Enterococcus spp.",5 mcg,17,14-16,13
+Levofloxacin ," S. pneumoniae, Streptococcus spp. Viridans group, Streptococcus spp. beta haemolytic group",5 mcg,17,14-16,13
+Levofloxacin , Staphylococcus spp.,5 mcg,19,16-18,15
+Levofloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,17,-,-
+Levofloxacin , Enterobacteriaceae (EUCAST),5 mcg,23,19-22,19
+Levofloxacin ," Staphylococcus spp., Pseudomonas spp (EUCAST)",5 mcg,22,-,22
+Levofloxacin , Coagulase-negative Staphylococci (EUCAST),5 mcg,24,-,24
+Levofloxacin , Enterococcus spp. (EUCAST),5 mcg,15,-,15
+Levofloxacin , Acinetobacter spp. (EUCAST),5 mcg,23,20-22,20
+Levofloxacin ," Streptococcus group A, B, C & G (EUCAST)",5 mcg,17,-,17
+Levofloxacin , S. pneumoniae (EUCAST),5 mcg,16,-,16
+Levofloxacin , Haemophilus influenzae (EUCAST),5 mcg,30,-,30
+Levofloxacin , Moraxella catarrhalis (EUCAST),5 mcg,29,-,29
+Levofloxacin , Pasteurella multocida (EUCAST),5 mcg,27,-,27
+Levofloxacin , Kingella kingae (EUCAST),5 mcg,28,-,28
+Linezolid , Staphylococcus spp.,30 mcg,21,-,20
+Linezolid , Enterococcus spp.,30 mcg,23,-,21
+Linezolid ," S. pneumoniae, Streptococcus spp. Viridans group, Streptococcus spp. beta haemolytic group",30 mcg,21,-,-
+Linezolid , Enterococcus spp. (EUCAST),10 mcg,21,-,21
+Linezolid , Staphylococcus spp. (EUCAST),10 mcg,19,-,19
+Linezolid ," Streptococcus group A B, C & G (EUCAST)",10 mcg,19,16-18,16
+Linezolid , Corynebacterium spp. (EUCAST),10 mcg,25,-,25
+Linezolid , S. pneumoniae (EUCAST),10 mcg,22,19-21,19
+Lomefloxacin ," Enterobacteriaceae, P. aeruginosa & Staphylococcus spp.",10 mcg,22,19-21,18
+Lomefloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,22,-,-
+Lomefloxacin , Neisseria gonorrhoeae,10 mcg,38,27-37,26
+Mecillinam , Enterobacteriaceae,10 mcg,15,2025-12-14,11
+Mecillinam , Enterobacteriaceae (Uncomplicated UTI only),10 mcg,15,-,15
+Meropenem , Enterobacteriaceae,10 mcg,23,20-22,19
+Meropenem , P. aeruginosa,10 mcg,19,16-18,15
+Meropenem , Staphylococcus spp.,10 mcg,16,14-15,13
+Meropenem , B. cepacia,10 mcg,20,16-19,15
+Meropenem , Haemophilus influenzae & Haemophilus parainfluenzae,10 mcg,20,-,-
+Meropenem , Neisseria meningitidis,10 mcg,30,-,-
+Meropenem , Acinetobacter spp.,10 mcg,18,15-17,14
+Meropenem , Enterobacteriaceae (EUCAST),10 mcg,22,16-21,16
+Meropenem , Pseudomonas spp. (EUCAST),10 mcg,24,18-23,18
+Meropenem , Acinetobacter spp. (EUCAST),10 mcg,21,15-20,15
+Meropenem , Haemophilus influenzae (EUCAST),10 mcg,20,-,20
+Meropenem , Moraxella catarrhalis (EUCAST),10 mcg,33,-,33
+Meropenem , Listeria monocytogenes (EUCAST),10 mcg,26,-,26
+Meropenem , Aerococcus sanguinicola & urinae (EUCAST),10 mcg,31,-,31
+Meropenem , Kingella kingae (EUCAST),10 mcg,30,-,30
+Methicillin,-,5 mcg,-,-,-
+Mezlocillin,-,75 mcg,-,-,-
+Minocycline ," Enterobacteriaceae, Acinetobacter, B. cepacia, S. maltophila, Staphylococcus & Enterococcus spp.",30 mcg,16,13-15,12
+Minocycline , Neisseria meningitidis,30 mcg,26,-,<19
+Minocycline , Staphylococcus spp. (EUCAST),30 mcg,23,20-22,20
+Minocycline ," Streptococcus group A, B C & G (EUCAST)",30 mcg,23,20-22,20
+Minocycline , S. pneumoniae (EUCAST),30 mcg,24,21-23,21
+Minocycline , Haemophilus influenzae (EUCAST),30 mcg,24,21-23,21
+Minocycline , Moraxella catarrhalis (EUCAST),30 mcg,25,22-24,22
+Moxalactam , Enterobacteriaceae,30 mcg,-,-,-
+Moxifloxacin , Staphylococcus spp.,5 mcg,18,15-17,14
+Moxifloxacin , Haemophilus influenzae & S. pneumoniae,5 mcg,18,-,-
+Moxifloxacin , Enterobacteriaceae (EUCAST),5 mcg,22,-,22
+Moxifloxacin , Staphylococcus spp. (EUCAST),5 mcg,25,-,25
+Moxifloxacin , Coagulase-negative Staphylococci (EUCAST),5 mcg,28,-,28
+Moxifloxacin , Streptococcus group A. B. C & G (EUCAST),5 mcg,19,-,19
+Moxifloxacin , S. pneumoniae (EUCAST),5 mcg,22,-,22
+Moxifloxacin , Haemophilus influenzae (EUCAST),5 mcg,28,-,28
+Moxifloxacin , Corynebacterium spp. (EUCAST),5 mcg,25,-,25
+Moxifloxacin , Moraxella catarrhalis (EUCAST),5 mcg,26,-,26
+Mupirocin , Staphylococcus spp.,200 mcg,-,-,-
+Nafcillin,-,1 mcg,-,-,-
+Nalidixic Acid , Enterobacteriaceae,30 mcg,19,14-18,13
+Nalidixic Acid , Haemophilus influenzae (EUCAST),30 mcg,23,-,23
+Nalidixic Acid ," Moraxella catarrhalis, Pasteurella multocida (EUCAST)",30 mcg,23,-,23
+Netilmicin Sulphate ," Enterobacteriaceae, P. aeruginosa, Staphylococcus spp.",30 mcg,15,13-14,12
+Netilmicin Sulphate , Enterobacteriaceae (EUCAST),10 mcg,15,2025-12-14,12
+Netilmicin Sulphate , Staphylococcus spp. (EUCAST),10 mcg,18,-,18
+Netilmicin Sulphate , Coagulase negative Staphylococci (EUCAST),10 mcg,22,-,22
+Netilmicin Sulphate , Pseudomonas spp. (EUCAST),10 mcg,12,-,12
+Netilmicin Sulphate , Acinetobacter spp. (EUCAST),10 mcg,16,-,16
+Nitrofurantoin ," Enterobacteriaceae, Staphylococcus & Enterococcus spp.",300 mcg,17,15-16,14
+Nitrofurantoin , Enterobacteriaceae (EUCAST),100 mcg,11,-,11
+Nitrofurantoin , Staphylococcus spp. (EUCAST),100 mcg,13,-,13
+Nitrofurantoin ," Streptococcus group A, B, C & G, Enterococcus spp. (EUCAST)",100 mcg,15,-,15
+Nitrofurantoin , Aerococcus sanguinicola & unnae (EUCAST),100 mcg,16,-,16
+Nitroxoline , Enterobacteriaceae (uncomplicated UTIs only),30 mcg,15,-,15
+Norfloxacin ," Enterobacteriaceae, P. aeruginosa, Staphylococcus & Enterococcus spp.",10 mcg,17,13-16,12
+Norfloxacin , Enterobacteriaceae spp. (EUCAST),10 mcg,22,19-21,19
+Norfloxacin , Staphylococcus spp. (EUCAST),10 mcg,17,-,17
+Norfloxacin , Enterococcus spp. (EUCAST),10 mcg,12,-,12
+Norfloxacin ," Streptococcus group A, B C & G. (EUCAST)",10 mcg,12,-,-
+Norfloxacin , S. pneumoniae (EUCAST),10 mcg,11,-,-
+Norfloxacin , Aerococcus sanguinicola & urinae (EUCAST),10 mcg,17,-,17
+Novobiocin,-,30 mcg,22,18-21,17
+Ofloxacin ," Enterobacteriaceae, P. aeruginosa, S. pneumoniae, Streptococcus spp.",5 mcg,16,13-15,12
+Ofloxacin , Staphylococcus spp.,5 mcg,18,15-17,14
+Ofloxacin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,16,-,-
+Ofloxacin , Neisseria gonorrhoeae,5 mcg,31,25-30,24
+Ofloxacin , Enterobacteriaceae (EUCAST),5 mcg,24,22-23,22
+Ofloxacin , Staphylococcus spp. (EUCAST),5 mcg,20,-,20
+Ofloxacin , Coagulase-negative Staphylococci (EUCAST),5 mcg,24,-,24
+Ofloxacin , Haemophilus influenzae (EUCAST),5 mcg,30,-,30
+Ofloxacin , Moraxella catarrhalis (EUCAST),5 mcg,28,-,28
+Oxacillin , Staphylococcus (S. pseudintermedius),1 mcg,18,-,17
+Oxacillin , S. pneumoniae,1 mcg,20,-,-
+Oxacillin , S. pneumoniae (EUCAST),1 mcg,20,-,-
+Pefloxacin , Enterobacteriaceae (S Typhi),5 mcg,24,-,23
+Pefloxacin , Enterobacteriaceae,5 mcg,24,-,24
+Penicillin,G- Staphylococcus spp.,10 units,29,-,28
+Penicillin,G- Enterococcus spp.,10 units,15,-,14
+Penicillin,G- Neisseria gonorrhoeae,10 units,47,27-46,26
+Penicillin,G- Streptococcus spp. beta haemolytic group,10 units,24,-,-
+Penicillin G , Staphylococcus spp. (EUCAST),1 unit,26,-,26
+Penicillin G ," Streptococcus group A, B, C & G (EUCAST)",1 unit,18,-,18
+Penicillin G , Streptococcus spp. viridans group (EUCAST),1 unit,18,2025-12-17,12
+Penicillin G , Haemophilus influenzae (EUCAST),1 unit,12,-,12
+Penicillin G , Listeria monocytogens (EUCAST),1 unit,13,-,13
+Penicillin G , Pasteurella multocida (EUCAST),1 unit,17,-,17
+Penicillin G , Corynebacterium spp. (EUCAST),1 unit,29,-,29
+Penicillin G , Aerococcus sanguinicola & urinae (EUCAST),1 unit,2,-,2
+Penicillin G , Kingella kingae (EUCAST),1 unit,25,-,25
+Piperacillin , Enterobacteriaceae & Acinetobacter spp.,100 mcg,21,18-20,17
+Piperacillin , P. aeruginosa,100 mcg,21,15-20,14
+Piperacillin , Enterobacteriaceae (EUCAST),30 mcg,17,17-19,17
+Piperacillin , Pseudomonas spp. (EUCAST),30 mcg,18,-,18
+Piperacillin/Tazobactam , Enterobacteriaceae & Acinetobacter spp.,100/10 mcg,21,18-20,17
+Piperacillin/Tazobactam , P. aeruginosa,100/10 mcg,21,15-20,14
+Piperacillin/Tazobactam , Haemophilus influenzae & Haemophilus parainfluenzae,100/10 mcg,21,-,-
+Piperacillin/Tazobactam , Enterobacteriaceae (EUCAST),30/6 mcg,17,17-19,17
+Piperacillin/Tazobactam , Pseudomonas spp. (EUCAST),30/6 mcg,18,-,18
+Polymyxin-B,-,300 Units,-,-,-
+Pristinomycin (Quinupristin/Dalfopristin) ," Staphylococcus, Enterococcus spp.",15 mcg,19,16-18,15
+Pristinomycin (Quinupristin/Dalfopristin) ," S. pneumoniae, Streptococcus spp. beta haemolytic group & Viridans group",15 mcg,19,16-18,15
+Pristinomycin (Quinupristin/Dalfopristin) , Staphylococcus spp. (EUCAST),15 mcg,21,18-20,18
+Pristinomycin (Quinupristin/Dalfopristin) , Enterococcus spp. (EUCAST),15 mcg,22,20-21,20
+Rifampicin ," Staphylococcus, Enterococcus spp.",5 mcg,20,17-19,16
+Rifampicin , Haemophilus influenzae & Haemophilus parainfluenzae,5 mcg,20,17-19,16
+Rifampicin , Neisseria meningitidis,5 mcg,25,20-24,19
+Rifampicin , S. pneumoniae,5 mcg,20,17-18,16
+Rifampicin , Staphylococcus spp (EUCAST),5 mcg,26,23-25,23
+Rifampicin ," Streptococcus group A, B, C & G (EUCAST)",5 mcg,21,15-20,15
+Rifampicin , S. pneumoniae (EUCAST),5 mcg,22,17-21,17
+Rifampicin , Haemophilus influenzae (EUCAST),5 mcg,18,-,18
+Rifampicin , Corynebacterium spp. (EUCAST),5 mcg,30,25-29,25
+Rifampicin , Aerococcus sanguinicola & urinae (EUCAST),5 mcg,25,-,25
+Rifampicin , Kingella kingae (EUCAST),5 mcg,20,-,20
+Sparfloxacin , Enterobacteriaceae,5 mcg,-,-,-
+Sparfloxacin ," Staphylococcus, S. pneumoniae",5 mcg,19,16-18,15
+Spectinomycin , Neisseria gonorrhoeae,100 mcg,18,15-17,14
+Streptomycin , Enterococcus spp. (High Level),300 mcg,10,2025-07-09,6
+Streptomycin , Enterobacteriaceae,10 mcg,15,2025-12-14,11
+Sulphafurazole (Sulfisoxazole) , Enterobacteriaceae & Staphylococcus,300 mcg,17,13-16,12
+Teicoplanin , Enterococcus spp.,30 mcg,14,2025-11-13,10
+Teicoplanin , Enterococcus spp. (EUCAST),30 mcg,16,-,16
+Teicoplanin , Streptococcus spp. viridans group (EUCAST),30 mcg,16,-,16
+Teicoplanin ," Streptococcus group A, C & G (EUCAST)",30 mcg,15,-,15
+Teicoplanin , S. pneumoniae (EUCAST),30 mcg,17,-,17
+Tetracycline ," Enterobacteriaceae, Acinetobacter, Staphylococcus, Enterococcus spp. & Neisseria meningitidis",30 mcg,19,15-18,14
+Tetracycline , Haemophilus influenzae & Haemophilus parainfluenzae,30 mcg,29,26-28,25
+Tetracycline , Neisseria gonorrhoeae,30 mcg,38,31-37,30
+Tetracycline ," S. pneumoniae, Streptococcus spp. beta haemolytic group & Viridans group",30 mcg,28,25-27,24
+Tetracycline , Staphylococcus spp. (EUCAST),30 mcg,22,19-21,19
+Tetracycline ," Streptococcus group A, B, C & G (EUCAST)",30 mcg,23,20-22,20
+Tetracycline ," S. pneumoniae, Haemophilus influenzae (EUCAST)",30 mcg,25,22-24,22
+Tetracycline , Corynebacterium spp (EUCAST),30 mcg,24,-,24
+Tetracycline , Pasteurella multocida (EUCAST),30 mcg,24,-,24
+Tetracycline , Campylobacter jejuni & coli (EUCAST),30 mcg,30,-,30
+Tetracycline , Moraxella catarrhalis (EUCAST),30 mcg,28,25-27,25
+Tetracycline , Kingella kingae (EUCAST),30 mcg,28,-,28
+Ticarcillin/Clavulanic Acid , Enterobacteriaceae & Acinetobacter,75/10mcg,20,15-19,14
+Ticarcillin/Clavulanic Acid , P. aeruginosa,75/10mcg,24,16-23,15
+Ticarcillin/Clavulanic Acid , Staphylococcus spp.,75/10mcg,23,-,22
+Ticarcillin/Clavulanic Acid , Enterobacteriaceae (EUCAST),75/10mcg,23,20-22,20
+Ticarcillin/Clavulanic Acid , Pseudomonas spp. (EUCAST),75/10mcg,18,-,18
+Ticarcillin , Enterobacteriaceae,75 mcg,-,-,-
+Ticarcillin , Enterobacteriaceae (EUCAST),75 mcg,23,20-22,20
+Ticarcillin , Pseudomonas spp. (EUCAST),75 mcg,18,-,18
+Tigecycline ," Enterobacteriaceae, Enterococcus spp",15 mcg,18,15-17,15
+Tigecycline , Staphylococcus spp.,15 mcg,18,-,18
+Tigecycline ," Streptococcus group A, B, C & G",15 mcg,19,16-18,16
+Tigecycline , General QC,15 mcg,-,-,-
+Tobramycin ," Enterobacteriaceae, P. aeruginosa, Acinetobacter & Staphylococcus spp.",10 mcg,15,13-14,12
+Tobramycin , Enterobacteriaceae (EUCAST),10 mcg,17,14-16,14
+Tobramycin , Staphylococcus spp. (EUCAST),10 mcg,18,-,18
+Tobramycin , Coagulase negative Staphylococci (EUCAST),10 mcg,22,-,22
+Tobramycin , Pseudomonas spp. (EUCAST),10 mcg,16,-,16
+Tobramycin , Acinetobacter spp. (EUCAST),10 mcg,17,-,17
+Trimethoprim ," Enterobacteriaceae, Staphylococcus spp",5 mcg,16,2025-11-15,10
+Trimethoprim , Enterobacteriaceae (EUCAST),5 mcg,18,15-17,15
+Trimethoprim , Staphylococcus spp. (EUCAST),5 mcg,17,14-16,14
+Trimethoprim , Enterococcus spp. (EUCAST),5 mcg,21,50,21-49
+Ulifloxacin (Prulifloxacin),-,5 mcg,-,-,-
+Vancomycin , Enterococcus spp.,30 mcg,17,15-16,14
+Vancomycin ," S. pneumoniae, Streptococcus spp. beta haemolytic group & Streptococcus spp. Viridans group",30 mcg,17,-,-
+Vancomycin , Enterococcus spp. (EUCAST),5 mcg,12,-,<120
+Vancomycin ," Streptococcus group A B, C & G (EUCAST)",5 mcg,13,-,13
+Vancomycin , S.pneumoniae (EUCAST),5 mcg,15,-,15
+Vancomycin , Streptococcus spp. viridans group (EUCAST),5 mcg,16,-,16
+Vancomycin , Corynebacterium spp. (EUCAST),5 mcg,17,-,17
+Vancomycin , Aerococcus sanguinicola & urinae (EUCAST),5 mcg,16,-,16`;
+
+        let parsedData = [];
+        let allAntibiotics = [];
+        let selectedAntibiotic = '';
+
+        // DOM Elements
+        const antibioticSearchInput = document.getElementById('antibiotic-search');
+        const antibioticOptionsContainer = document.getElementById('antibiotic-options');
+        const antibioticDropdownContainer = document.getElementById('antibiotic-dropdown-container');
+        const microorganismSelect = document.getElementById('microorganism');
+        const discContentSelect = document.getElementById('discContent');
+        const diameterInput = document.getElementById('diameter');
+        const resultDisplay = document.getElementById('result-display');
+        const resultIcon = document.getElementById('result-icon');
+        const resultTitle = document.getElementById('result-title');
+        const resultDescription = document.getElementById('result-description');
+        const criteriaContainer = document.getElementById('criteria-container');
+        const refSusceptible = document.getElementById('ref-susceptible');
+        const refIntermediate = document.getElementById('ref-intermediate');
+        const refResistant = document.getElementById('ref-resistant');
+        const inhibitionZone = document.getElementById('inhibition-zone');
+        const diameterLabel = document.getElementById('diameter-label');
+
+        /**
+         * Parses the raw CSV data into a structured JavaScript array of objects.
+         * Includes robust parsing for numeric and range values in criteria columns.
+         */
+        function parseCSV() {
+            const lines = csvData.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            // Regex to split by comma, but not if inside double quotes
+            const regex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+
+            parsedData = lines.slice(1).map(line => {
+                const values = line.split(regex).map(v => v.trim().replace(/"/g, ''));
+                let obj = {};
+                headers.forEach((header, i) => {
+                    let value = values[i] || '';
+
+                    // Clean up numeric/range fields
+                    if (header === 'Sensitive (mm or more)' || header === 'Resistant (mm or less)') {
+                        // For sensitive and resistant, parse as float. If invalid, set to '-'.
+                        const numVal = parseFloat(value);
+                        obj[header] = isNaN(numVal) ? '-' : numVal.toString();
+                    } else if (header === 'Intermediate (mm)') {
+                        // For intermediate, handle ranges (e.g., "15-17") or single numbers.
+                        // If it's a date-like string or other invalid text, set to '-'.
+                        if (value === '-') {
+                            obj[header] = '-';
+                        } else if (value.includes('-')) {
+                            const parts = value.split('-').map(p => parseFloat(p.trim()));
+                            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                                obj[header] = `${parts[0]}-${parts[1]}`;
+                            } else {
+                                obj[header] = '-'; // Invalid range format
+                            }
+                        } else {
+                            const numVal = parseFloat(value);
+                            if (!isNaN(numVal)) {
+                                obj[header] = numVal.toString(); // Single intermediate value
+                            } else {
+                                obj[header] = '-'; // Invalid intermediate value (e.g., date string)
+                            }
+                        }
+                    } else {
+                        obj[header] = value;
+                    }
+                });
+                return obj;
+            });
+        }
+
+        /**
+         * Populates the custom searchable antibiotic dropdown with a given list of antibiotics.
+         */
+        function populateAntibioticOptions(antibioticList) {
+            antibioticOptionsContainer.innerHTML = ''; // Clear existing options
+            if (antibioticList.length === 0) {
+                const noResultDiv = document.createElement('div');
+                noResultDiv.textContent = 'No results found';
+                noResultDiv.classList.add('p-2', 'text-gray-500');
+                antibioticOptionsContainer.appendChild(noResultDiv);
+                return;
+            }
+            antibioticList.forEach(antibiotic => {
+                const optionDiv = document.createElement('div');
+                optionDiv.textContent = antibiotic;
+                optionDiv.classList.add('p-2', 'hover:bg-indigo-50', 'cursor-pointer', 'rounded');
+                
+                optionDiv.addEventListener('mousedown', () => {
+                    antibioticSearchInput.value = antibiotic;
+                    selectedAntibiotic = antibiotic;
+                    antibioticOptionsContainer.classList.add('hidden');
+                    updateMicroorganisms();
+                });
+                antibioticOptionsContainer.appendChild(optionDiv);
+            });
+        }
+
+        /**
+         * Updates dependent dropdowns when the antibiotic selection changes.
+         */
+        function updateMicroorganisms() {
+            microorganismSelect.innerHTML = '<option value="">Select a microorganism</option>';
+            microorganismSelect.disabled = true;
+            discContentSelect.innerHTML = '<option value="">Select disc content</option>';
+            discContentSelect.disabled = true;
+            diameterInput.disabled = true;
+            resetResultAndViz();
+
+            if (selectedAntibiotic) {
+                const microorganisms = [...new Set(parsedData
+                    .filter(item => item['Antibiotic agent'] === selectedAntibiotic)
+                    .map(item => item['Micro-organism']))];
+                
+                microorganisms.sort().forEach(micro => {
+                    const option = document.createElement('option');
+                    option.value = micro;
+                    option.textContent = micro;
+                    microorganismSelect.appendChild(option);
+                });
+                microorganismSelect.disabled = false;
+            }
+        }
+        
+        /**
+         * Updates the disc content dropdown based on previous selections.
+         */
+        function updateDiscContent() {
+            const selectedMicroorganism = microorganismSelect.value;
+            discContentSelect.innerHTML = '<option value="">Select disc content</option>';
+            discContentSelect.disabled = true;
+            diameterInput.disabled = true;
+            resetResultAndViz();
+
+            if (selectedAntibiotic && selectedMicroorganism) {
+                const discContents = [...new Set(parsedData
+                    .filter(item => item['Antibiotic agent'] === selectedAntibiotic && item['Micro-organism'] === selectedMicroorganism)
+                    .map(item => item['Disc Content']))];
+                
+                discContents.sort().forEach(content => {
+                    const option = document.createElement('option');
+                    option.value = content;
+                    option.textContent = content;
+                    discContentSelect.appendChild(option);
+                });
+                discContentSelect.disabled = false;
+            }
+        }
+
+        /**
+         * Enables the diameter input and triggers evaluation.
+         */
+        function enableDiameterInput() {
+            const selectedDisc = discContentSelect.value;
+            diameterInput.disabled = !selectedDisc;
+            resetResultAndViz();
+            if (selectedDisc) {
+                evaluate();
+            }
+        }
+
+        /**
+         * Resets the result, criteria, and visualization displays.
+         */
+        function resetResultAndViz() {
+            resultDisplay.classList.add('hidden');
+            criteriaContainer.classList.add('hidden');
+            resultDisplay.className = 'result-card p-4 rounded-lg hidden flex items-center space-x-3';
+            resultTitle.textContent = '';
+            resultDescription.textContent = '';
+            refSusceptible.textContent = '-';
+            refIntermediate.textContent = '-';
+            refResistant.textContent = '-';
+            updateVisualization(0, 'Unknown');
+        }
+
+        /**
+         * Updates the petri dish visualization.
+         */
+        function updateVisualization(diameter, result) {
+            const maxDiameter = 50; // An estimated max zone size for scaling
+            const maxRadius = 95; // Max radius in SVG
+            const discRadius = 6; // Antibiotic disc radius in SVG
+            
+            let zoneRadius = (diameter / 2) / (maxDiameter / 2) * maxRadius;
+            if (zoneRadius < discRadius) zoneRadius = discRadius;
+            if (zoneRadius > maxRadius) zoneRadius = maxRadius;
+
+            inhibitionZone.setAttribute('r', zoneRadius);
+            diameterLabel.textContent = `${diameter || 0} mm`;
+            
+            inhibitionZone.classList.remove('zone-susceptible', 'zone-intermediate', 'zone-resistant', 'zone-unknown');
+            
+            let iconClass = 'fa-question-circle';
+            
+            switch(result) {
+                case 'Susceptible':
+                    inhibitionZone.classList.add('zone-susceptible');
+                    resultIcon.className = 'fa-solid fa-lg fa-check-circle';
+                    break;
+                case 'Intermediate':
+                    inhibitionZone.classList.add('zone-intermediate');
+                    resultIcon.className = 'fa-solid fa-lg fa-exclamation-circle';
+                    break;
+                case 'Resistant':
+                    inhibitionZone.classList.add('zone-resistant');
+                    resultIcon.className = 'fa-solid fa-lg fa-times-circle';
+                    break;
+                default:
+                    inhibitionZone.classList.add('zone-unknown');
+                    inhibitionZone.setAttribute('r', discRadius); // No zone if unknown or 0
+                    resultIcon.className = 'fa-solid fa-lg fa-question-circle';
+                    break;
+            }
+        }
+
+        /**
+         * Main evaluation function to classify the microorganism.
+         */
+        function evaluate() {
+            const antibiotic = selectedAntibiotic;
+            const microorganism = microorganismSelect.value;
+            const discContent = discContentSelect.value;
+            const diameter = parseFloat(diameterInput.value);
+
+            resetResultAndViz();
+
+            if (!antibiotic || !microorganism || !discContent) {
+                updateVisualization(0, 'Unknown');
+                return;
+            }
+
+            const criteria = parsedData.find(item => 
+                item['Antibiotic agent'] === antibiotic &&
+                item['Micro-organism'] === microorganism &&
+                item['Disc Content'] === discContent
+            );
+
+            if (!criteria) {
+                updateVisualization(diameter || 0, 'Unknown');
+                return;
+            }
+
+            const s_val = criteria['Sensitive (mm or more)'];
+            const i_val = criteria['Intermediate (mm)'];
+            const r_val = criteria['Resistant (mm or less)'];
+            
+            refSusceptible.textContent = s_val !== '-' ? `≥ ${s_val} mm` : 'N/A';
+            refIntermediate.textContent = i_val !== '-' ? `${i_val} mm` : 'N/A';
+            refResistant.textContent = r_val !== '-' ? `≤ ${r_val} mm` : 'N/A';
+            criteriaContainer.classList.remove('hidden');
+
+            if (isNaN(diameter)) {
+                updateVisualization(0, 'Unknown');
+                return;
+            }
+
+            let result = 'Unknown';
+            let description = 'Could not determine the category based on the provided values.';
+            let resultClass = 'result-unknown';
+
+            const sensitive = parseFloat(s_val);
+            const resistant = parseFloat(r_val);
+            let isIntermediateDefined = false;
+            let intermediateLower = NaN;
+            let intermediateUpper = NaN;
+
+            if (i_val !== '-') {
+                const parts = i_val.split('-').map(p => parseFloat(p.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    intermediateLower = parts[0];
+                    intermediateUpper = parts[1];
+                    isIntermediateDefined = true;
+                } else if (parts.length === 1 && !isNaN(parts[0])) {
+                    // Single intermediate value, treat as a range where lower and upper are the same
+                    intermediateLower = parts[0];
+                    intermediateUpper = parts[0];
+                    isIntermediateDefined = true;
+                }
+            }
+
+            if (s_val !== '-' && diameter >= sensitive) {
+                result = 'Susceptible';
+                description = `A zone of ${diameter}mm is considered susceptible.`;
+                resultClass = 'result-susceptible';
+            } else if (r_val !== '-' && diameter <= resistant) {
+                result = 'Resistant';
+                description = `A zone of ${diameter}mm is considered resistant.`;
+                resultClass = 'result-resistant';
+            } else if (isIntermediateDefined && diameter >= intermediateLower && diameter <= intermediateUpper) {
+                result = 'Intermediate';
+                description = `A zone of ${diameter}mm is considered intermediate.`;
+                resultClass = 'result-intermediate';
+            }
+            // If none of the above, result remains 'Unknown'
+
+            resultTitle.textContent = result;
+            resultDescription.textContent = description;
+            resultDisplay.className = `result-card ${resultClass} p-4 rounded-lg flex items-center space-x-3`;
+            resultDisplay.classList.remove('hidden');
+
+            updateVisualization(diameter, result);
+        }
+
+        /**
+         * Sets up all the event listeners for the application.
+         */
+        function addEventListeners() {
+            antibioticSearchInput.addEventListener('focus', () => {
+                antibioticOptionsContainer.classList.remove('hidden');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!antibioticDropdownContainer.contains(e.target)) {
+                    antibioticOptionsContainer.classList.add('hidden');
+                }
+            });
+
+            antibioticSearchInput.addEventListener('input', () => {
+                const filter = antibioticSearchInput.value.toLowerCase();
+                const filtered = allAntibiotics.filter(ab => ab.toLowerCase().includes(filter));
+                populateAntibioticOptions(filtered);
+                if (antibioticSearchInput.value === '') {
+                    selectedAntibiotic = '';
+                    updateMicroorganisms();
+                }
+            });
+            
+            antibioticSearchInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    const currentText = antibioticSearchInput.value;
+                    const exactMatch = allAntibiotics.find(ab => ab.toLowerCase() === currentText.toLowerCase());
+
+                    if (exactMatch) {
+                        antibioticSearchInput.value = exactMatch;
+                        if (selectedAntibiotic !== exactMatch) {
+                            selectedAntibiotic = exactMatch;
+                            updateMicroorganisms();
+                        }
+                    } else {
+                        if(selectedAntibiotic){
+                           antibioticSearchInput.value = selectedAntibiotic;
+                        } else {
+                           antibioticSearchInput.value = '';
+                           selectedAntibiotic = '';
+                           updateMicroorganisms();
+                        }
+                    }
+                    if(!antibioticOptionsContainer.matches(':hover')){
+                       antibioticOptionsContainer.classList.add('hidden');
+                    }
+                }, 150);
+            });
+
+            microorganismSelect.addEventListener('change', updateDiscContent);
+            discContentSelect.addEventListener('change', enableDiameterInput);
+            diameterInput.addEventListener('input', evaluate);
+        }
+
+        // Initial setup on window load
+        window.onload = () => {
+            parseCSV();
+            allAntibiotics = [...new Set(parsedData.map(item => item['Antibiotic agent']))].sort();
+            populateAntibioticOptions(allAntibiotics);
+            addEventListeners();
+            resetResultAndViz();
+        };
+
+    </script>
+</body>
+</html>
