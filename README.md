@@ -37,11 +37,11 @@ To run this project locally, simply download the `KBz - Antibiotic Susceptibilit
 
 1.  **Clone the repository or download the source code:**
     ```sh
-    git clone [https://github.com/your-username/your-repository-name.git](https://github.com/your-username/your-repository-name.git)
+    git clone https://github.com/Namstaxk/KBz-Antibiotic-Susceptibility-Analyzer.git
     ```
 2.  **Navigate to the project directory:**
     ```sh
-    cd your-repository-name
+    cd KBz-Antibiotic-Susceptibility-Analyzer
     ```
 3.  **Open the `KBz - Antibiotic Susceptibility Analyzer.html` file in your browser.**
     You can do this by double-clicking the file or by right-clicking and selecting "Open with" your preferred browser.
